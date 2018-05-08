@@ -16,7 +16,7 @@ from .mediawikipage import (MediaWikiPage)
 from .utilities import (memoize)
 
 URL = 'https://github.com/barrust/mediawiki'
-VERSION = '0.4.1'
+VERSION = '0.4.2'
 
 
 class MediaWiki(object):
@@ -726,11 +726,64 @@ class MediaWiki(object):
                     raise PageError(title=title)
                 else:
                     title = temp_title
-            return MediaWikiPage(self, title, redirect=redirect,
-                                 preload=preload)
+            results = self.load_pages(titles=[title], redirect=redirect,
+                                      preload=preload)
         else:  # must be pageid
-            return MediaWikiPage(self, pageid=pageid, preload=preload)
+            results = self.load_pages(pageids=[pageid], redirect=redirect,
+                                      preload=preload)
+        return results[0]
     # end page
+
+    def load_pages(self, titles=None, pageids=None, redirect=True,
+                   preload=False):
+        ''' Return a list of pages at once to reduce the queries to the
+            MediaWiki server
+
+
+            Args:
+                titles (list): A list of titles to pull
+                pageids (list): A list of page ids to pull
+                redirect (bool): **True:** Follow page redirects
+                preload (bool): **True:** Load most page properties
+            Raises:
+                ValueError: when title is blank or None and no pageid is \
+                            provided
+            Raises:
+                :py:func:`mediawiki.exceptions.PageError`: if page does \
+                not exist
+            Note:
+                If pulling multiple, known pages, this is **highly** \
+                recommended!
+            Note:
+                Title takes precedence over pageid if both are provided
+
+            .. versionadded:: 0.4.2 '''
+        if titles is None and pageids is None:
+            raise ValueError('Either a titles or a pageids must be specified')
+        if titles is not None and not isinstance(titles, list):
+            raise ValueError('titles must be a list')
+        if pageids is not None and not isinstance(pageids, list):
+            raise ValueError('pageids must be a list')
+
+        params = {
+            'prop': 'info|pageprops',
+            'inprop': 'url',
+            'ppprop': 'disambiguation',
+            'redirects': '',
+        }
+        if titles:
+            params['titles'] = '|'.join(sorted(titles))
+        elif pageids:
+            as_str = '|'.join([str(page_id) for page_id in sorted(pageids)])
+            params['pageids'] = as_str
+
+        raw_res = self.wiki_request(params)
+        # print(raw_res)
+        results = list()
+        for page_id in raw_res['query']['pages'].keys():
+            results.append(MediaWikiPage(self, page_id, raw_res,
+                                         redirect=redirect, preload=preload))
+        return results
 
     def wiki_request(self, params):
         ''' Make a request to the MediaWiki API using the given search

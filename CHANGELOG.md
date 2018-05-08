@@ -1,5 +1,11 @@
 # MediaWiki Changelog
 
+## Version 0.4.2
+
+* Add ability to pull multiple pages at once to reduce the traffic on
+MediaWiki servers
+
+
 ## Version 0.4.1
 
 * Default to `https`

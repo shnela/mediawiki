@@ -36,19 +36,11 @@ class MediaWikiPage(object):
             This should never need to be used directly! Please use \
             :func:`mediawiki.MediaWiki.page` '''
 
-    def __init__(self, mediawiki, title=None, pageid=None, redirect=True,
-                 preload=False, original_title=''):
+    def __init__(self, mediawiki, page_id, passed_results, redirect=True,
+                 preload=True):
 
         self.mediawiki = mediawiki
         self.url = None
-        if title is not None:
-            self.title = title
-            self.original_title = original_title or title
-        elif pageid is not None:
-            self.pageid = pageid
-        else:
-            raise ValueError('Either a title or a pageid must be specified')
-
         self._content = ''
         self._revision_id = False
         self._parent_id = False
@@ -64,8 +56,11 @@ class MediaWikiPage(object):
         self._sections = False
         self._logos = False
         self._hatnotes = False
+        self.pageid = page_id
 
-        self.__load(redirect=redirect, preload=preload)
+        self.__parse(passed_results, page_id, redirect)
+
+        # self.__load(redirect=redirect, preload=preload)
 
         preload_props = ['content', 'summary', 'images', 'references', 'links',
                          'sections', 'redirects', 'coordinates', 'backlinks',
@@ -475,36 +470,27 @@ class MediaWikiPage(object):
         return None
 
     # Protected Methods
-    def __load(self, redirect=True, preload=False):
-        ''' load the basic page information '''
-        query_params = {
-            'prop': 'info|pageprops',
-            'inprop': 'url',
-            'ppprop': 'disambiguation',
-            'redirects': '',
-        }
-        query_params.update(self.__title_query_param())
-
-        request = self.mediawiki.wiki_request(query_params)
-
-        query = request['query']
-        pageid = list(query['pages'].keys())[0]
+    def __parse(self, results, pageid, redirect):
+        ''' parse the page id information back out '''
+        query = results['query']
         page = query['pages'][pageid]
+
+        if 'redirects' in query and not redirect:
+            reds = [x['from'] for x in query['redirects']]
+            raise RedirectError('|'.join(reds))
+
+        self.pageid = pageid
+        if page.get('title', False) is not False:
+            self.title = page.get('title')
+            self.url = page.get('fullurl')
 
         # determine result of the request
         # missing is present if the page is missing
         if 'missing' in page:
             self._raise_page_error()
-        # redirects is present in query if page is a redirect
-        elif 'redirects' in query:
-            self._handle_redirect(redirect, preload, query, page)
         # if pageprops is returned, it must be a disambiguation error
         elif 'pageprops' in page:
             self._raise_disambiguation_error(page, pageid)
-        else:
-            self.pageid = pageid
-            self.title = page['title']
-            self.url = page['fullurl']
 
     def _raise_page_error(self):
         ''' raise the correct type of page error '''
