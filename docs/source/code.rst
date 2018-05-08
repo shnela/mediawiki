@@ -16,7 +16,8 @@ MediaWiki
     :members: version, api_version, extensions, rate_limit,
               rate_limit_min_wait, timeout, language, user_agent, api_url,
               memoized, clear_memoized, refresh_interval, set_api_url,
-              supported_languages, random, categorytree, page, wiki_request
+              supported_languages, random, categorytree, page, load_pages,
+              wiki_request
 
     .. automethod:: mediawiki.MediaWiki.suggest(query)
     .. automethod:: mediawiki.MediaWiki.search(query, results=10, suggestion=False)

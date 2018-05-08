@@ -944,23 +944,23 @@ class TestMediaWikiPage(unittest.TestCase):
         self.response = self.site.responses[self.site.api_url]
         self.pag = self.site.page('arya')
 
-    def test_call_directly(self):
-        ''' test calling MediaWikiPage directly '''
-        page = MediaWikiPage(self.site, title="arya")
-        self.assertEqual(page.title, self.response['arya']['title'])
+    # def test_call_directly(self):
+    #     ''' test calling MediaWikiPage directly '''
+    #     page = MediaWikiPage(self.site, title="arya")
+    #     self.assertEqual(page.title, self.response['arya']['title'])
 
-    def test_call_directly_error(self):
-        ''' test calling MediaWikiPage directly with error message'''
-        try:
-            MediaWikiPage(self.site)
-        except ValueError as ex:
-            msg = 'Either a title or a pageid must be specified'
-            self.assertEqual(str(ex), msg)
+    # def test_call_directly_error(self):
+    #     ''' test calling MediaWikiPage directly with error message'''
+    #     try:
+    #         MediaWikiPage(self.site)
+    #     except ValueError as ex:
+    #         msg = 'Either a title or a pageid must be specified'
+    #         self.assertEqual(str(ex), msg)
 
-    def test_page_value_err(self):
-        ''' test that ValueError is thrown when error calling mediawikipage
-        directly '''
-        self.assertRaises(ValueError, lambda: MediaWikiPage(self.site))
+    # def test_page_value_err(self):
+    #     ''' test that ValueError is thrown when error calling mediawikipage
+    #     directly '''
+    #     self.assertRaises(ValueError, lambda: MediaWikiPage(self.site))
 
     def test_page_value_err_msg(self):
         ''' test that ValueError message thrown from random'''

@@ -5076,7 +5076,7 @@
    "zh-yue": "粵語",
    "zu": "isiZulu"
   },
-  "redirect_error_msg": "\"arya\" resulted in a redirect. Set the redirect property to True to allow automatic redirects."
+  "redirect_error_msg": "\"Arya\" resulted in a redirect. Set the redirect property to True to allow automatic redirects."
  },
  "https://en.wikipedia.org/w/api.php": {
   "antivirus_software_logos": [],
@@ -24770,7 +24770,7 @@
   ],
   "page_error_msg": "\"gobbilygook\" does not match any pages. Try another query!",
   "page_error_msg_pageid": "Page id \"-1\" does not match any pages. Try another id!",
-  "page_error_msg_title": "\"gobbilygook\" does not match any pages. Try another query!",
+  "page_error_msg_title": "\"Gobbilygook\" does not match any pages. Try another query!",
   "page_no_external_links": [],
   "page_no_hatnotes": [],
   "page_no_sec_links": null,
