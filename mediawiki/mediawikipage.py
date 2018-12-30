@@ -14,7 +14,7 @@ from .exceptions import (MediaWikiException, PageError, RedirectError,
                          DisambiguationError, ODD_ERROR_MESSAGE)
 
 from mediawiki.mediawikipage_properties import (
-    MediaWikiPageProperty,
+    MediaWikiPagePropertyHandler as PropertyHandler,
     Content,
     Summary,
     Images,
@@ -90,8 +90,7 @@ class MediaWikiPage(object):
             props = list()
             for prop in preload_props:
                 props.append(getattr(MediaWikiPage, prop))
-            MediaWikiPageProperty.get_batch_properties(props,
-                                                       page_instance=self)
+            PropertyHandler.get_batch_properties(props, page_instance=self)
         # end __init__
 
     def __repr__(self):

@@ -8,58 +8,8 @@ from __future__ import (unicode_literals, absolute_import)
 from collections import defaultdict
 
 
-class MediaWikiPageProperty:
-    ''' BaseClass for retrieving MediaWikiPage's properties
-
-    This is data descriptor which will be overridden in order to request for
-    MediaWikiPage particular properties.
-    It's build way which makes merging property pulls possible according to:
-    https://github.com/barrust/mediawiki/issues/55
-    To learn more about python descriptors visit:
-    https://docs.python.org/3.8/howto/descriptor.html
-    '''
-    query_params = dict()
-
-    def __init__(self, val_holder_name):
-        self.val_holder_name = val_holder_name
-
-    def __get__(self, page_instance, owner):
-        ''' Returns stored property or downloads it from server. '''
-        if page_instance is None:
-            return self
-        if not hasattr(page_instance, self.val_holder_name):
-            # property isn't stored in page_instance, download it from server
-            query_params = self.get_query_params(page_instance)
-            continued_query_it = self._continued_query(query_params,
-                                                       page_instance)
-            query_data = self._parse_continued_query(continued_query_it)
-            result = self.parse_query_data(query_data)
-            setattr(page_instance, self.val_holder_name, result)
-        return getattr(page_instance, self.val_holder_name)
-
-    def __set__(self, page_instance, value):
-        ''' Make descriptor read-only
-        https://docs.python.org/3.8/howto/descriptor.html#descriptor-protocol
-        '''
-        raise AttributeError("You can't set value for read-only descriptor.")
-
-    def get_query_params(self, page_instance):
-        ''' Returns default query_params for property. '''
-        query_params = self.query_params
-        title_query_param = self._title_query_param(page_instance)
-        query_params.update(title_query_param)
-        return query_params
-
-    def parse_query_data(self, query_data):
-        ''' Get property value from result of _parse_continued_query. '''
-        raise NotImplementedError()
-
-    @staticmethod
-    def _title_query_param(page_instance):
-        ''' Util function to determine which parameter method to use. '''
-        if getattr(page_instance, 'title', None) is not None:
-            return {'titles': page_instance.title}
-        return {'pageids': page_instance.pageid}
+class MediaWikiPagePropertyHandler:
+    ''' Class responsible for handling MediaWikiPageProperty's requests '''
 
     @staticmethod
     def _continued_query(query_params, page_instance, key='pages'):
@@ -102,7 +52,6 @@ class MediaWikiPageProperty:
                 break
 
             last_cont = request['continue']
-            break
 
     @staticmethod
     def _parse_continued_query(query_iterator):
@@ -140,7 +89,11 @@ class MediaWikiPageProperty:
     @staticmethod
     def _check_for_prop_conflict(new_query_params, collected_query_params):
         ''' Checks if two query_params have conflicting values. '''
+        specifying_params = ['titles', 'pageids', 'revids']
         for new_param, new_param_val in new_query_params.items():
+            if new_param in specifying_params:
+                # specifying params are allowed
+                continue
             has_param = new_param in collected_query_params
             if has_param and new_param_val in collected_query_params[new_param]:
                 return True
@@ -159,18 +112,17 @@ class MediaWikiPageProperty:
         main_query_params = dict()
         main_query_properties = set()
         # list to which will be added parameters to each query
-        query_params_groups = [(main_query_params, main_query_properties), ]
+        query_params_groups = list()
         for mediawiki_page_property in mediawiki_page_properties:
             # iterate over MediaWikiPageProperty instances
             query_params = \
                 mediawiki_page_property.get_query_params(page_instance)
-            if 'generator' in query_params:
-                # every generator must be handled in separated query
-                query_params_groups.append(
-                    (query_params, {mediawiki_page_property})
-                )
-            elif cls._check_for_prop_conflict(query_params, main_query_params):
-                # there's parameter conflict, create new props group
+            contains_generator = 'generator' in query_params
+            parameter_conflict = cls._check_for_prop_conflict(query_params,
+                                                              main_query_params)
+            if contains_generator or parameter_conflict:
+                # every generator and equal parameters must be handled
+                # in separated query
                 query_params_groups.append(
                     (query_params, {mediawiki_page_property})
                 )
@@ -182,7 +134,61 @@ class MediaWikiPageProperty:
                     else:
                         main_query_params[param] = param_val
                     main_query_properties.add(mediawiki_page_property)
+
+        if main_query_properties:
+            query_params_groups.append(
+                (main_query_params, main_query_properties)
+            )
         return query_params_groups
+
+
+class MediaWikiPageProperty:
+    ''' BaseClass for retrieving MediaWikiPage's properties
+
+    This is data descriptor which will be overridden in order to request for
+    MediaWikiPage particular properties.
+    It's build way which makes merging property pulls possible according to:
+    https://github.com/barrust/mediawiki/issues/55
+    To learn more about python descriptors visit:
+    https://docs.python.org/3.8/howto/descriptor.html
+    '''
+    query_params = dict()
+
+    def __init__(self, val_holder_name):
+        self.val_holder_name = val_holder_name
+
+    def __get__(self, page_instance, owner):
+        ''' Returns stored property or downloads it from server. '''
+        if page_instance is None:
+            return self
+        if not hasattr(page_instance, self.val_holder_name):
+            MediaWikiPagePropertyHandler.get_batch_properties([self],
+                                                              page_instance)
+        return getattr(page_instance, self.val_holder_name)
+
+    def __set__(self, page_instance, value):
+        ''' Make descriptor read-only
+        https://docs.python.org/3.8/howto/descriptor.html#descriptor-protocol
+        '''
+        raise AttributeError("You can't set value for read-only descriptor.")
+
+    def get_query_params(self, page_instance):
+        ''' Returns default query_params for property. '''
+        query_params = self.query_params
+        title_query_param = self._title_query_param(page_instance)
+        query_params.update(title_query_param)
+        return query_params
+
+    def parse_query_data(self, query_data):
+        ''' Get property value from result of _parse_continued_query. '''
+        raise NotImplementedError()
+
+    @staticmethod
+    def _title_query_param(page_instance):
+        ''' Util function to determine which parameter method to use. '''
+        if getattr(page_instance, 'title', None) is not None:
+            return {'titles': page_instance.title}
+        return {'pageids': page_instance.pageid}
 
 
 class Content(MediaWikiPageProperty):
