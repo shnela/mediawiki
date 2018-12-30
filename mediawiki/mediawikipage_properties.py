@@ -166,16 +166,15 @@ class MediaWikiPageProperty:
                 mediawiki_page_property.get_query_params(page_instance)
             if 'generator' in query_params:
                 # every generator must be handled in separated query
-                query_params_groups.append((query_params,
-                                            {mediawiki_page_property}))
+                query_params_groups.append(
+                    (query_params, {mediawiki_page_property})
+                )
+            elif cls._check_for_prop_conflict(query_params, main_query_params):
+                # there's parameter conflict, create new props group
+                query_params_groups.append(
+                    (query_params, {mediawiki_page_property})
+                )
             else:
-                if cls._check_for_prop_conflict(query_params,
-                                                main_query_params):
-                    # there's parameter conflict, create new props group
-                    query_params_groups.append(
-                        (query_params, {mediawiki_page_property})
-                    )
-                    continue
                 for param, param_val in query_params.items():
                     # add new parameters to main_query_params
                     if param in main_query_params:
