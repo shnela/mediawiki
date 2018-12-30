@@ -13,6 +13,13 @@ from .utilities import (str_or_unicode, is_relative_url)
 from .exceptions import (MediaWikiException, PageError, RedirectError,
                          DisambiguationError, ODD_ERROR_MESSAGE)
 
+from mediawiki.mediawikipage_properties import (
+    Content,
+    Summary,
+    Images,
+    References,
+)
+
 
 class MediaWikiPage(object):
     ''' MediaWiki Page Instance
@@ -39,6 +46,13 @@ class MediaWikiPage(object):
             This should never need to be used directly! Please use \
             :func:`mediawiki.MediaWiki.page` '''
 
+    content = Content('_content')
+    summary = Summary('_summary')
+    images = Images('_images')
+    references = References('_references')
+    # TODO: use metaclass to avoid redundant consctructor arguments
+    # TODO: add other properties
+
     def __init__(self, mediawiki, title=None, pageid=None, redirect=True,
                  preload=False, original_title=''):
 
@@ -52,18 +66,14 @@ class MediaWikiPage(object):
         else:
             raise ValueError('Either a title or a pageid must be specified')
 
-        self._content = ''
         self._revision_id = False
         self._parent_id = False
         self._html = False
-        self._images = False
-        self._references = False
         self._categories = False
         self._coordinates = False
         self._links = False
         self._redirects = False
         self._backlinks = False
-        self._summary = False
         self._sections = False
         self._table_of_contents = False
         self._logos = False
@@ -121,18 +131,6 @@ class MediaWikiPage(object):
         return self._content, self._revision_id, self._parent_id
 
     @property
-    def content(self):
-        ''' str: The page content in text format
-
-            Note:
-                Not settable
-            Note:
-                Side effect is to also get revision_id and parent_id '''
-        if not self._content:
-            self._pull_content_revision_parent()
-        return self._content
-
-    @property
     def revision_id(self):
         ''' int: The current revision id of the page
 
@@ -179,26 +177,6 @@ class MediaWikiPage(object):
         return self._html
 
     @property
-    def images(self):
-        ''' list: Images on the page
-
-            Note:
-                Not settable '''
-        if self._images is False:
-            self._images = list()
-            params = {
-                'generator': 'images',
-                'gimlimit': 'max',
-                'prop': 'imageinfo',  # this will be replaced by fileinfo
-                'iiprop': 'url'
-            }
-            for page in self._continued_query(params):
-                if 'imageinfo' in page and 'url' in page['imageinfo'][0]:
-                    self._images.append(page['imageinfo'][0]['url'])
-            self._images = sorted(self._images)
-        return self._images
-
-    @property
     def logos(self):
         ''' list: Parse images within the infobox signifying either the main \
                   image or logo
@@ -243,21 +221,6 @@ class MediaWikiPage(object):
                             tmp.append(child)
                     self._hatnotes.append(''.join(tmp))
         return self._hatnotes
-
-    @property
-    def references(self):
-        ''' list: External links, or references, listed anywhere on the \
-                  MediaWiki page
-            Note:
-                Not settable
-            Note
-                May include external links within page that are not \
-                technically cited anywhere '''
-        if self._references is False:
-            params = {'prop': 'extlinks', 'ellimit': 'max'}
-            tmp = [link['*'] for link in self._continued_query(params)]
-            self._references = sorted(tmp)
-        return self._references
 
     @property
     def categories(self):
@@ -361,16 +324,6 @@ class MediaWikiPage(object):
                    for link in self._continued_query(params, 'backlinks')]
             self._backlinks = sorted(tmp)
         return self._backlinks
-
-    @property
-    def summary(self):
-        ''' str: Default page summary
-
-            Note:
-                Not settable '''
-        if self._summary is False:
-            self._summary = self.summarize()
-        return self._summary
 
     def summarize(self, sentences=0, chars=0):
         ''' Summarize page either by number of sentences, chars, or first
