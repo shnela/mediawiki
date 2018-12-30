@@ -21,19 +21,21 @@ class MediaWikiPageProperty:
     query_params = dict()
 
     def __init__(self, val_holder_name):
-        self._val_holder_name = val_holder_name
+        self.val_holder_name = val_holder_name
 
     def __get__(self, page_instance, owner):
         ''' Returns stored property or downloads it from server. '''
-        if not hasattr(page_instance, self._val_holder_name):
+        if page_instance is None:
+            return self
+        if not hasattr(page_instance, self.val_holder_name):
             # property isn't stored in page_instance, download it from server
             query_params = self.get_query_params(page_instance)
             continued_query_it = self._continued_query(query_params,
                                                        page_instance)
             query_data = self._parse_continued_query(continued_query_it)
             result = self.parse_query_data(query_data)
-            setattr(page_instance, self._val_holder_name, result)
-        return getattr(page_instance, self._val_holder_name)
+            setattr(page_instance, self.val_holder_name, result)
+        return getattr(page_instance, self.val_holder_name)
 
     def __set__(self, page_instance, value):
         ''' Make descriptor read-only
@@ -87,7 +89,8 @@ class MediaWikiPageProperty:
                 for datum in pages.values():
                     yield (generator_name, datum)
             elif isinstance(pages, list):
-                # TODO: check when this case is used tests don't cover this case
+                # TODO: check when this case is used.
+                #  Tests don't cover this path.
                 for datum in list(enumerate(pages)):
                     yield datum[1]
             else:
@@ -99,6 +102,7 @@ class MediaWikiPageProperty:
                 break
 
             last_cont = request['continue']
+            break
 
     @staticmethod
     def _parse_continued_query(query_iterator):
@@ -114,6 +118,72 @@ class MediaWikiPageProperty:
                 query_data[q_prop].append(q_prop_val)
 
         return query_data
+
+    # section with functions for bulk requests
+    @classmethod
+    def get_batch_properties(cls, mediawiki_page_properties, page_instance):
+        ''' Pulls combined properties for requested page. '''
+        query_params_groups = cls.combine_query_params(
+            mediawiki_page_properties, page_instance
+        )
+        for query_params, mediawiki_page_properties in query_params_groups:
+            # TODO: use threads
+            continued_query_it = cls._continued_query(
+                query_params, page_instance)
+
+            query_data = cls._parse_continued_query(continued_query_it)
+            for mediawiki_page_property in mediawiki_page_properties:
+                result = mediawiki_page_property.parse_query_data(query_data)
+                setattr(page_instance, mediawiki_page_property.val_holder_name,
+                        result)
+
+    @staticmethod
+    def _check_for_prop_conflict(new_query_params, collected_query_params):
+        ''' Checks if two query_params have conflicting values. '''
+        for new_param, new_param_val in new_query_params.items():
+            has_param = new_param in collected_query_params
+            if has_param and new_param_val in collected_query_params[new_param]:
+                return True
+        return False
+
+    @classmethod
+    def combine_query_params(cls, mediawiki_page_properties, page_instance):
+        ''' Combines requested properties to minimum amount of queries.
+
+            Returns:
+                List of parameters and MediaWikiPageProperty instances to be
+                handled in separate queries.
+                In format:
+                [(query_parameters: dict, MediaWikiPageProperty instances: set)]
+        '''
+        main_query_params = dict()
+        main_query_properties = set()
+        # list to which will be added parameters to each query
+        query_params_groups = [(main_query_params, main_query_properties), ]
+        for mediawiki_page_property in mediawiki_page_properties:
+            # iterate over MediaWikiPageProperty instances
+            query_params = \
+                mediawiki_page_property.get_query_params(page_instance)
+            if 'generator' in query_params:
+                # every generator must be handled in separated query
+                query_params_groups.append((query_params,
+                                            {mediawiki_page_property}))
+            else:
+                if cls._check_for_prop_conflict(query_params,
+                                                main_query_params):
+                    # there's parameter conflict, create new props group
+                    query_params_groups.append(
+                        (query_params, {mediawiki_page_property})
+                    )
+                    continue
+                for param, param_val in query_params.items():
+                    # add new parameters to main_query_params
+                    if param in main_query_params:
+                        main_query_params[param] += '|{}'.format(param_val)
+                    else:
+                        main_query_params[param] = param_val
+                    main_query_properties.add(mediawiki_page_property)
+        return query_params_groups
 
 
 class Content(MediaWikiPageProperty):
